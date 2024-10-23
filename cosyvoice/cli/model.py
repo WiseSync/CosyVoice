@@ -20,7 +20,6 @@ from contextlib import nullcontext
 import uuid
 from cosyvoice.utils.common import fade_in_out
 
-
 class CosyVoiceModel:
 
     def __init__(self,

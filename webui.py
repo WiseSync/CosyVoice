@@ -159,7 +159,7 @@ def main():
 
         generate_button = gr.Button("生成音频")
 
-        audio_output = gr.Audio(label="合成音频", autoplay=True, streaming=True)
+        audio_output = gr.Audio(label="合成音频", autoplay=True, type="filepath")
 
         seed_button.click(generate_seed, inputs=[], outputs=seed)
         generate_button.click(generate_audio,
@@ -178,7 +178,7 @@ if __name__ == '__main__':
                         default=8000)
     parser.add_argument('--model_dir',
                         type=str,
-                        default='pretrained_models/CosyVoice-300M',
+                        default='pretrained_models/CosyVoice-300M-Instruct',
                         help='local path or modelscope repo id')
     args = parser.parse_args()
     cosyvoice = CosyVoice(args.model_dir)

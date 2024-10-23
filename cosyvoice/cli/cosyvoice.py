@@ -61,6 +61,7 @@ class CosyVoice:
             for model_output in self.model.tts(**model_input, stream=stream, speed=speed):
                 speech_len = model_output['tts_speech'].shape[1] / 22050
                 logging.info('yield speech len {}, rtf {}'.format(speech_len, (time.time() - start_time) / speech_len))
+                #torchaudio.save('sft_{}.wav'.format(time.time()), model_output['tts_speech'], 22050)
                 yield model_output
                 start_time = time.time()
 
@@ -100,6 +101,7 @@ class CosyVoice:
             for model_output in self.model.tts(**model_input, stream=stream, speed=speed):
                 speech_len = model_output['tts_speech'].shape[1] / 22050
                 logging.info('yield speech len {}, rtf {}'.format(speech_len, (time.time() - start_time) / speech_len))
+                #torchaudio.save('instruct_{}.wav'.format(time.time()), model_output['tts_speech'], 22050)
                 yield model_output
                 start_time = time.time()
 

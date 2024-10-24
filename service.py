@@ -2,7 +2,6 @@ import os
 import sys
 import argparse
 import numpy as np
-import torch
 import opuslib  # 导入 opuslib 用于 Opus 编码
 import librosa  # 导入 librosa 用于下采样
 from io import BytesIO
@@ -46,7 +45,7 @@ async def audio_generator(text, instruction, spk_id, speed):
     生成器函数，逐步生成并发送 Opus 编码的音频数据块。
     """
     try:
-        stream = True  # 固定为流式
+        stream = False  # 固定为流式
         buffer = np.array([], dtype=np.int16)  # 初始化缓冲区
 
         for i in cosyvoice.inference_instruct(text, spk_id, instruction, stream=stream, speed=speed):

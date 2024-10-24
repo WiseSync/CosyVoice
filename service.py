@@ -3,12 +3,13 @@ import sys
 import argparse
 import numpy as np
 import opuslib  # 导入 opuslib 用于 Opus 编码
-import librosa  # 导入 librosa 用于下采样
+import torchaudio  # 导入 torchaudio 用于重采样
 from io import BytesIO
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse, JSONResponse
 import uvicorn
 import traceback
+import torch
 
 # 设置路径
 ROOT_DIR = os.getcwd()
@@ -26,6 +27,8 @@ app = FastAPI()
 prompt_sr, target_sr = 16000, 16000  # 输出采样率为16kHz
 default_data = np.zeros(target_sr)
 
+resampler = torchaudio.transforms.Resample(orig_freq=22050, new_freq=target_sr)
+
 # 初始化 Opus 编码器
 # 参数：
 # - 采样率（16000 Hz）
@@ -34,8 +37,8 @@ default_data = np.zeros(target_sr)
 try:
     opus_encoder = opuslib.Encoder(target_sr, 1, opuslib.APPLICATION_AUDIO)
     # 可选：设置 Opus 编码器参数，如比特率、复杂度等
-    # opus_encoder.bitrate = 64000  # 设置比特率为64kbps
-    # opus_encoder.complexity = 10    # 设置编码复杂度
+    opus_encoder.bitrate = 24000  # 设置比特率为64kbps
+    opus_encoder.complexity = 10    # 设置编码复杂度
 except Exception as e:
     print("Opus 编码器初始化失败：", e)
     sys.exit(1)
@@ -50,16 +53,17 @@ async def audio_generator(text, instruction, spk_id, speed):
 
         for i in cosyvoice.inference_instruct(text, spk_id, instruction, stream=stream, speed=speed):
             speech_chunk = i['tts_speech']
-            speech_np = speech_chunk.numpy().flatten()
 
-            # 下采样从22050 Hz到16000 Hz
-            speech_resampled = librosa.resample(speech_np, orig_sr=22050, target_sr=target_sr)
+            with torch.no_grad():
+                speech_resampled = resampler(speech_chunk)  # (1, M)
 
-            # 将 float32 转换为 int16，保持原始范围
-            speech_int16 = np.int16(speech_resampled * 32767)
+            speech_clamped = torch.clamp(speech_resampled, -1.0, 1.0)
+            speech_int16 = (speech_clamped * 32767).to(torch.int16)  # (M,)
+                
+            speech_np = speech_int16.numpy().flatten()
 
             # 将下采样后的音频数据添加到缓冲区
-            buffer = np.concatenate((buffer, speech_int16))
+            buffer = np.concatenate((buffer, speech_np))
 
             # 每次取出320帧进行编码
             while len(buffer) >= 320:

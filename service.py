@@ -3,7 +3,8 @@ import sys
 import argparse
 import numpy as np
 import torch
-import scipy.io.wavfile
+import opuslib  # 导入 opuslib 用于 Opus 编码
+import librosa  # 导入 librosa 用于下采样
 from io import BytesIO
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse, JSONResponse
@@ -22,18 +23,82 @@ from cosyvoice.utils.common import set_all_random_seed
 
 app = FastAPI()
 
-max_val = 0.8
-prompt_sr, target_sr = 16000, 22050  # 输出为16kHz
+# 全局配置
+prompt_sr, target_sr = 16000, 16000  # 输出采样率为16kHz
 default_data = np.zeros(target_sr)
+
+# 初始化 Opus 编码器
+# 参数：
+# - 采样率（16000 Hz）
+# - 声道数（1声道）
+# - 应用类型（APPLICATION_AUDIO）
+try:
+    opus_encoder = opuslib.Encoder(target_sr, 1, opuslib.APPLICATION_AUDIO)
+    # 可选：设置 Opus 编码器参数，如比特率、复杂度等
+    # opus_encoder.bitrate = 64000  # 设置比特率为64kbps
+    # opus_encoder.complexity = 10    # 设置编码复杂度
+except Exception as e:
+    print("Opus 编码器初始化失败：", e)
+    sys.exit(1)
+
+async def audio_generator(text, instruction, spk_id, speed):
+    """
+    生成器函数，逐步生成并发送 Opus 编码的音频数据块。
+    """
+    try:
+        stream = True  # 固定为流式
+        buffer = np.array([], dtype=np.int16)  # 初始化缓冲区
+
+        for i in cosyvoice.inference_instruct(text, spk_id, instruction, stream=stream, speed=speed):
+            speech_chunk = i['tts_speech']
+            speech_np = speech_chunk.numpy().flatten()
+
+            # 下采样从22050 Hz到16000 Hz
+            speech_resampled = librosa.resample(speech_np, orig_sr=22050, target_sr=target_sr)
+
+            # 将 float32 转换为 int16，保持原始范围
+            speech_int16 = np.int16(speech_resampled * 32767)
+
+            # 将下采样后的音频数据添加到缓冲区
+            buffer = np.concatenate((buffer, speech_int16))
+
+            # 每次取出320帧进行编码
+            while len(buffer) >= 320:
+                frame = buffer[:320]
+                buffer = buffer[320:]
+
+                # 编码为 Opus 数据
+                opus_data = opus_encoder.encode(frame.tobytes(), 320)
+                # 发送 Opus 数据长度（16位）
+                yield len(opus_data).to_bytes(2, byteorder='little')
+                # 发送 Opus 数据
+                yield opus_data
+
+        # 处理缓冲区中剩余的音频数据
+        if len(buffer) > 0:
+            # 如果剩余帧不足320帧，进行填充
+            padding = 320 - len(buffer)
+            frame = np.pad(buffer, (0, padding), 'constant', constant_values=0)
+            opus_data = opus_encoder.encode(frame.tobytes(), 320)
+            # 发送 Opus 数据长度（16位）
+            yield len(opus_data).to_bytes(2, byteorder='little')
+            yield opus_data
+
+    except Exception as e:
+        traceback.print_exc()
+        yield b''  # 发送空数据表示结束
 
 @app.post("/text2speech")
 async def text2speech(request: Request):
+    """
+    处理 /text2speech 的 POST 请求，生成音频并流式传输给客户端。
+    """
     try:
         data = await request.json()
     except:
         traceback.print_exc()
         return JSONResponse(content={'error': 'Invalid JSON data.'}, status_code=400)
-    
+
     text = data.get('text', '')
     instruction = data.get('instruction', '')
     seed = data.get('seed', 0)
@@ -67,39 +132,12 @@ async def text2speech(request: Request):
     # 设置随机种子
     set_all_random_seed(seed)
 
-    # 生成音频
+    # 返回 StreamingResponse
     try:
-        stream = False  # 固定为流式
-        audio_chunks = []
-        for i in cosyvoice.inference_instruct(text, spk_id, instruction, stream=stream, speed=speed):
-            speech_chunk = i['tts_speech']
-            print(speech_chunk.shape)
-            audio_chunks.append(speech_chunk.numpy().flatten())
-
-        # 拼接所有音频块
-        if audio_chunks:
-            full_speech = np.concatenate(audio_chunks)
-            print(full_speech.shape)
-        else:
-            return JSONResponse(content={'error': 'No audio generated.'}, status_code=500)
-
-        # 将音频保存到缓冲区
-        buffer = BytesIO()
-        # 将 float32 转换为 int16
-        full_speech = np.int16(full_speech  * 32767)
-        scipy.io.wavfile.write(buffer, target_sr, full_speech)
-        buffer.seek(0)
-
-        # 返回音频文件
-        return StreamingResponse(buffer, media_type="audio/wav", headers={
-            'Content-Disposition': 'attachment; filename="output.wav"'
+        generator = audio_generator(text, instruction, spk_id, speed)
+        return StreamingResponse(generator, media_type="audio/opus", headers={
+            'Content-Disposition': 'attachment; filename="output.opus"'
         })
-
-        # 返回音频文件
-        return StreamingResponse(buffer, media_type="audio/wav", headers={
-            'Content-Disposition': 'attachment; filename="output.wav"'
-        })
-
     except Exception as e:
         traceback.print_exc()
         return JSONResponse(content={'error': str(e)}, status_code=500)

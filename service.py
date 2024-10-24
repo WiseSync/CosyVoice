@@ -45,7 +45,7 @@ async def audio_generator(text, instruction, spk_id, speed):
     生成器函数，逐步生成并发送 Opus 编码的音频数据块。
     """
     try:
-        stream = False  # 固定为流式
+        stream = True  # 固定为流式
         buffer = np.array([], dtype=np.int16)  # 初始化缓冲区
 
         for i in cosyvoice.inference_instruct(text, spk_id, instruction, stream=stream, speed=speed):

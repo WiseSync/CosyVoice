@@ -23,6 +23,14 @@ from cosyvoice.utils.common import set_all_random_seed
 
 app = FastAPI()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 允许所有源
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # 全局配置
 prompt_sr, target_sr = 16000, 16000  # 输出采样率为16kHz
 default_data = np.zeros(target_sr)
@@ -37,7 +45,7 @@ resampler = torchaudio.transforms.Resample(orig_freq=22050, new_freq=target_sr)
 try:
     opus_encoder = opuslib.Encoder(target_sr, 1, opuslib.APPLICATION_AUDIO)
     # 可选：设置 Opus 编码器参数，如比特率、复杂度等
-    opus_encoder.bitrate = 24000  # 设置比特率为64kbps
+    opus_encoder.bitrate = 24000  # 设置比特率为24kbps
     opus_encoder.complexity = 10    # 设置编码复杂度
 except Exception as e:
     print("Opus 编码器初始化失败：", e)

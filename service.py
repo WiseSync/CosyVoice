@@ -52,7 +52,7 @@ except Exception as e:
     print("Opus 编码器初始化失败：", e)
     sys.exit(1)
 
-async def audio_generator(text, instruction, spk_id, speed):
+def audio_generator(text, instruction, spk_id, speed):
     """
     生成器函数，逐步生成并发送 Opus 编码的音频数据块。
     """

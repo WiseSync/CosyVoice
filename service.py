@@ -7,6 +7,7 @@ import torchaudio  # 导入 torchaudio 用于重采样
 from io import BytesIO
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import traceback
 import torch

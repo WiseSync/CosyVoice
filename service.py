@@ -4,13 +4,13 @@ import argparse
 import numpy as np
 import opuslib  # 导入 opuslib 用于 Opus 编码
 import torchaudio  # 导入 torchaudio 用于重采样
-from io import BytesIO
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import traceback
 import torch
+import platform
 
 # 设置路径
 ROOT_DIR = os.getcwd()
@@ -53,10 +53,13 @@ except Exception as e:
 
 def audio_generator(text, instruction, spk_id, speed):
     """
-    生成器函数，逐步生成并发送 Opus 编码的音频数据块。
+    Generator function that generates and sends Opus-encoded audio data chunks.
     """
     try:
-        stream = True  # 固定为流式
+        if platform.system() == 'Darwin':  # Check if the system is MacOS
+            stream = False
+        else:
+            stream = True  # 固定为流式
         buffer = np.array([], dtype=np.int16)  # 初始化缓冲区
 
         for i in cosyvoice.inference_instruct(text, spk_id, instruction, stream=stream, speed=speed):

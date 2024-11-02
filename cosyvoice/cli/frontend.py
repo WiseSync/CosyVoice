@@ -70,7 +70,7 @@ class CosyVoiceFrontEnd:
             self.frd.enable_pinyin_mix(True)
             self.frd.set_breakmodel_index(1)
         else:
-            self.zh_tn_model = ZhNormalizer(remove_erhua=False, full_to_half=False, traditional_to_simple=False, overwrite_cache=True)
+            self.zh_tn_model = ZhNormalizer(remove_erhua=False, full_to_half=False, traditional_to_simple=True, overwrite_cache=True)
             self.en_tn_model = EnNormalizer()
 
     def _extract_text_token(self, text):

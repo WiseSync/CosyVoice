@@ -36,8 +36,6 @@ app.add_middleware(
 prompt_sr, target_sr = 16000, 16000  # 输出采样率为16kHz
 default_data = np.zeros(target_sr)
 
-resampler = torchaudio.transforms.Resample(orig_freq=22050, new_freq=target_sr)
-
 # 初始化 Opus 编码器
 # 参数：
 # - 采样率（16000 Hz）
@@ -61,7 +59,7 @@ def audio_generator(text, instruction, spk_id, speed):
         else:
             stream = True  # 固定为流式
         buffer = np.array([], dtype=np.int16)  # 初始化缓冲区
-
+        resampler = torchaudio.transforms.Resample(orig_freq=22050, new_freq=target_sr)
         for i in cosyvoice.inference_instruct(text, spk_id, instruction, stream=stream, speed=speed):
             speech_chunk = i['tts_speech']
 

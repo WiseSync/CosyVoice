@@ -41,18 +41,21 @@ default_data = np.zeros(target_sr)
 # - 采样率（16000 Hz）
 # - 声道数（1声道）
 # - 应用类型（APPLICATION_AUDIO）
-try:
-    opus_encoder = opuslib.Encoder(target_sr, 1, opuslib.APPLICATION_VOIP)
-    # 可选：设置 Opus 编码器参数，如比特率、复杂度等
-    opus_encoder.bitrate = 24000  # 设置比特率为24kbps
-except Exception as e:
-    print("Opus encoder initialization failed:", e)
-    sys.exit(1)
+
 
 def audio_generator(text, instruction, spk_id, speed):
     """
     Generator function that generates and sends Opus-encoded audio data chunks.
     """
+    try:
+        opus_encoder = opuslib.Encoder(target_sr, 1, opuslib.APPLICATION_VOIP)
+        # 可选：设置 Opus 编码器参数，如比特率、复杂度等
+        if platform.system() != 'Darwin':
+            opus_encoder.bitrate = 24000  # 设置比特率为24kbps
+            opus_encoder.complexity = 10  # 设置复杂度为10
+    except Exception as e:
+        print("Opus encoder initialization failed:", e)
+        sys.exit(1)
     try:
         if platform.system() == 'Darwin':  # Check if the system is MacOS
             stream = False
@@ -62,7 +65,6 @@ def audio_generator(text, instruction, spk_id, speed):
         resampler = torchaudio.transforms.Resample(orig_freq=22050, new_freq=target_sr)
         for i in cosyvoice.inference_instruct(text, spk_id, instruction, stream=stream, speed=speed):
             speech_chunk = i['tts_speech']
-
             with torch.no_grad():
                 speech_resampled = resampler(speech_chunk)  # (1, M)
 
